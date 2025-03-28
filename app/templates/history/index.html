@@ -251,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
             tableHtml += `
                 <tr class="animate-fade-in">
                     <td>
-                        <a href="/history/${analysis.id}" class="fw-bold text-decoration-none">${analysis.title}</a>
+                        <a href="/history/load/${analysis.id}" class="fw-bold text-decoration-none">${analysis.title}</a>
                     </td>
                     <td>${analysis.total_tweets.toLocaleString()}</td>
                     <td>
@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>${formattedDate}</td>
                     <td>
                         <div class="d-flex">
-                            <a href="/history/${analysis.id}" class="btn btn-sm btn-outline-dark me-2" title="Lihat Detail">
+                            <a href="/history/load/${analysis.id}" class="btn btn-sm btn-outline-dark me-2" title="Lihat Detail">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                     <circle cx="12" cy="12" r="3"></circle>

@@ -5,7 +5,7 @@
 {% block content %}
 <div class="content">
     <!-- Input Section -->
-    <section id="input" class="main-tab-content active">
+    <section id="input" class="main-tab-content {% if 'analysis_file' in session %}d-none{% else %}active{% endif %}">
         <div class="card mb-4">
             <div class="card-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
@@ -46,12 +46,12 @@
     </section>
 
     <!-- Results Section (hidden until analysis is done) -->
-    <section id="results" class="main-tab-content d-none">
+    <section id="results" class="main-tab-content {% if 'analysis_file' in session %}active{% else %}d-none{% endif %}">
         {% include 'results.html' %}
     </section>
     
     <!-- Evaluation Section with Chatbot -->
-    <section id="evaluation" class="main-tab-content d-none">
+    <section id="evaluation" class="main-tab-content {% if 'analysis_file' in session %}d-none{% else %}d-none{% endif %}">
         <div class="card">
             <div class="card-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
@@ -106,4 +106,132 @@
         </div>
     </section>
 </div>
+
+{% if 'from_history' in session and session['from_history'] and 'analysis_data' in session %}
+<!-- Menyimpan data analisis dalam elemen tersembunyi -->
+<div id="analysis-data-container" style="display: none;" 
+     data-has-analysis="true"
+     data-title="{{ session.get('analysis_data', {}).get('title', '') }}"
+     data-total-tweets="{{ session.get('analysis_data', {}).get('total_tweets', 0) }}"
+     data-positive-count="{{ session.get('analysis_data', {}).get('positive_count', 0) }}"
+     data-neutral-count="{{ session.get('analysis_data', {}).get('neutral_count', 0) }}"
+     data-negative-count="{{ session.get('analysis_data', {}).get('negative_count', 0) }}"
+     data-positive-percent="{{ session.get('analysis_data', {}).get('positive_percent', 0) }}"
+     data-neutral-percent="{{ session.get('analysis_data', {}).get('neutral_percent', 0) }}"
+     data-negative-percent="{{ session.get('analysis_data', {}).get('negative_percent', 0) }}">
+</div>
+
+<!-- Menyimpan data JSON kompleks dalam format yang aman -->
+<script id="analysis-data" type="application/json">
+{{ session.get('analysis_data', {})|tojson }}
+</script>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<!-- JavaScript yang aman untuk menangani data analisis -->
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        // Cek apakah ada data analisis dari container
+        var dataContainer = document.getElementById('analysis-data-container');
+        if (dataContainer && dataContainer.getAttribute('data-has-analysis') === 'true') {
+            // Sembunyikan form input
+            var inputSection = document.getElementById('input');
+            if (inputSection) {
+                inputSection.classList.add('d-none');
+            }
+            
+            // Tampilkan hasil analisis
+            var resultsSection = document.getElementById('results');
+            if (resultsSection) {
+                resultsSection.classList.remove('d-none');
+                resultsSection.classList.add('active');
+            }
+            
+            // Aktifkan tab hasil analisis
+            var resultsTab = document.querySelector('[data-tab="results"]');
+            if (resultsTab) {
+                document.querySelectorAll('.nav-tabs-link').forEach(function(link) {
+                    link.classList.remove('active');
+                });
+                resultsTab.classList.add('active');
+                resultsTab.classList.remove('disabled');
+            }
+            
+            // Aktifkan tab evaluasi
+            var evaluationTab = document.querySelector('[data-tab="evaluation"]');
+            if (evaluationTab) {
+                evaluationTab.classList.remove('disabled');
+            }
+            
+            // Aktifkan tombol download report
+            var downloadReportBtn = document.getElementById('download-report-btn');
+            if (downloadReportBtn) {
+                downloadReportBtn.classList.remove('disabled');
+            }
+            
+            // Ambil data JSON dari script tag
+            var analysisDataScript = document.getElementById('analysis-data');
+            if (analysisDataScript) {
+                try {
+                    // Parse data JSON
+                    var analysisResults = JSON.parse(analysisDataScript.textContent);
+                    
+                    // Simpan ke window untuk digunakan oleh fungsi lain
+                    window.analysisResults = analysisResults;
+                    
+                    // Dapatkan referensi ke allTweets
+                    if (window.analysisResults && window.analysisResults.tweets) {
+                        window.allTweets = window.analysisResults.tweets;
+                    }
+                    
+                    // Inisialisasi komponen dengan data yang dimuat dari riwayat
+                    setTimeout(function() {
+                        // Perbarui elemen-elemen UI dengan data analisis
+                        if (typeof updateAnalysisResults === 'function') {
+                            try {
+                                updateAnalysisResults(window.analysisResults);
+                            } catch (error) {
+                                console.error("Error updating analysis results:", error);
+                            }
+                        }
+                        
+                        // Inisialisasi pagination
+                        if (typeof initializePagination === 'function') {
+                            try {
+                                initializePagination();
+                            } catch (error) {
+                                console.error("Error initializing pagination:", error);
+                            }
+                        }
+                        
+                        // Buat word cloud
+                        if (typeof createImprovedWordCloud === 'function') {
+                            try {
+                                createImprovedWordCloud(window.analysisResults);
+                            } catch (error) {
+                                console.error("Error creating word cloud:", error);
+                            }
+                        }
+                        
+                        // Generate topic
+                        if (typeof generateTopics === 'function') {
+                            try {
+                                generateTopics(window.analysisResults);
+                            } catch (error) {
+                                console.error("Error generating topics:", error);
+                            }
+                        }
+                    }, 500);
+                } catch (jsonError) {
+                    console.error("Error parsing analysis data JSON:", jsonError);
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Error initializing data from history:", error);
+    }
+});
+</script>
 {% endblock %}

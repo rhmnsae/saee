@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for, current_app
+from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for, current_app, session
 from flask_login import login_required, current_user
 
 from app.models import db
@@ -55,14 +55,13 @@ def get_history_data():
     
     return jsonify(response)
 
-@history_bp.route('/history/<int:analysis_id>')
+@history_bp.route('/history/load/<int:analysis_id>')
 @login_required
-def view_analysis(analysis_id):
-    """Menampilkan detail analisis"""
+def load_analysis(analysis_id):
+    """Memuat data analisis ke session dan redirect ke halaman utama"""
     analysis = Analysis.query.filter_by(id=analysis_id, user_id=current_user.id).first_or_404()
     
     # Load analysis result file if exists
-    result_data = None
     if analysis.result_file and os.path.exists(analysis.result_file):
         try:
             df = pd.read_csv(analysis.result_file)
@@ -79,6 +78,12 @@ def view_analysis(analysis_id):
                     'predicted_sentiment': row.get('predicted_sentiment', ''),
                     'confidence': row.get('confidence', 0)
                 }
+                
+                # Add optional fields if they exist
+                for field in ['tweet_url', 'image_url', 'lang', 'location']:
+                    if field in row and not pd.isna(row[field]):
+                        tweet[field] = row[field] if not pd.isna(row[field]) else ''
+                
                 tweets.append(tweet)
                 
             analysis_data = {
@@ -98,8 +103,8 @@ def view_analysis(analysis_id):
                 'tweets': tweets
             }
             
-            # Save to session for other views to use
-            request.session['analysis_context'] = {
+            # Simpan ke session untuk digunakan oleh halaman utama
+            session['analysis_context'] = {
                 'title': analysis.title,
                 'total_tweets': analysis.total_tweets,
                 'positive_count': analysis.positive_count,
@@ -111,11 +116,12 @@ def view_analysis(analysis_id):
                 'top_hashtags': [h['tag'] for h in analysis.get_hashtags()[:5]] if analysis.get_hashtags() else [],
                 'top_topics': [t['topic'] for t in analysis.get_topics()[:5]] if analysis.get_topics() else []
             }
-            request.session['analysis_file'] = analysis.result_file
+            session['analysis_file'] = analysis.result_file
+            session['from_history'] = True
+            session['analysis_data'] = analysis_data  # Tambahkan data analisis lengkap ke session
             
-            return render_template('history/view.html', title=f'Analisis: {analysis.title}', 
-                                 analysis=analysis, analysis_data=analysis_data)
-                                 
+            flash(f'Data analisis "{analysis.title}" berhasil dimuat', 'success')
+            return redirect(url_for('main.index'))
         except Exception as e:
             flash(f'Gagal memuat data analisis: {str(e)}', 'danger')
             return redirect(url_for('history.index'))

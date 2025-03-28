@@ -25,7 +25,7 @@
                 <nav>
                     {% if current_user.is_authenticated %}
                         <!-- Main navigation when logged in -->
-                        <a href="{{ url_for('main.index') }}" class="nav-tabs-link {% if request.endpoint == 'main.index' %}active{% endif %}">
+                        <a href="{{ url_for('main.index') }}" class="nav-tabs-link {% if request.endpoint == 'main.index' and not session.get('from_history') %}active{% endif %}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
                             Input Data
                         </a>
@@ -34,13 +34,14 @@
                             Riwayat
                         </a>
                         
+                        <!-- Tampilkan menu analisis jika ada data di session -->
                         {% if 'analysis_file' in session %}
                             <!-- Only show when analysis is available -->
-                            <a href="#main-content" class="nav-tabs-link {% if request.endpoint == 'results' %}active{% endif %}" data-tab="results">
+                            <a href="#main-content" class="nav-tabs-link {% if 'from_history' in session or 'results' in request.endpoint %}active{% endif %}" data-tab="results">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
                                 Hasil Analisis
                             </a>
-                            <a href="#main-content" class="nav-tabs-link {% if request.endpoint == 'evaluation' %}active{% endif %}" data-tab="evaluation">
+                            <a href="#main-content" class="nav-tabs-link {% if 'evaluation' in request.endpoint %}active{% endif %}" data-tab="evaluation">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                                 Evaluasi Kebijakan
                             </a>
@@ -51,6 +52,15 @@
                                     <line x1="12" y1="15" x2="12" y2="3"></line>
                                 </svg>
                                 Unduh Report
+                            </a>
+                            <a href="{{ url_for('main.clear_session') }}" id="new-analysis-btn" title="Buat Analisis Baru">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                                </svg>
+                                Baru
                             </a>
                         {% endif %}
                         
