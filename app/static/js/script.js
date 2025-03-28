@@ -69,21 +69,28 @@ document.addEventListener('DOMContentLoaded', function() {
     let negativeWordsChart = null;
     
     // Initialize Charts.js with global defaults
-    Chart.defaults.font.family = "'Inter', sans-serif";
-    Chart.defaults.color = '#333333';
-    Chart.defaults.plugins.legend.labels.usePointStyle = true;
-    Chart.defaults.plugins.tooltip.padding = 10;
-    Chart.defaults.plugins.tooltip.cornerRadius = 6;
-    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-    Chart.defaults.animation.duration = 1000;
-    Chart.defaults.animation.easing = 'easeOutQuart';
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#333333';
+        Chart.defaults.plugins.legend.labels.usePointStyle = true;
+        Chart.defaults.plugins.tooltip.padding = 10;
+        Chart.defaults.plugins.tooltip.cornerRadius = 6;
+        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        Chart.defaults.animation.duration = 1000;
+        Chart.defaults.animation.easing = 'easeOutQuart';
+    }
     
     // Main tab navigation handling
     navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
+            // Check if this is a URL link that should be followed normally
+            if (this.getAttribute('href') && this.getAttribute('href').startsWith('/')) {
+                return; // Let the browser handle the navigation
+            }
+            
             e.preventDefault();
             
-            // Jika tab dinonaktifkan, tampilkan peringatan dan hentikan
+            // If tab is disabled, show warning and stop
             if (this.classList.contains('disabled')) {
                 showAlert('Silakan upload dan analisis data terlebih dahulu', 'warning');
                 return;
@@ -99,8 +106,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add active class to clicked link and show corresponding content
             this.classList.add('active');
             const targetContent = document.getElementById(targetId);
-            targetContent.classList.add('active');
-            targetContent.classList.remove('d-none');
+            if (targetContent) {
+                targetContent.classList.add('active');
+                targetContent.classList.remove('d-none');
+            }
         });
     });
     
@@ -147,7 +156,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Enable previously disabled tabs
                 document.querySelector('[data-tab="results"]').classList.remove('disabled');
                 document.querySelector('[data-tab="evaluation"]').classList.remove('disabled');
-                document.getElementById('download-report-btn').classList.remove('disabled');
+                if (downloadReportBtn) {
+                    downloadReportBtn.classList.remove('disabled');
+                }
                 
                 // Update navigation
                 navLinks.forEach(l => l.classList.remove('active'));
@@ -164,6 +175,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Create word cloud (now in Analisis Kata tab)
                 createImprovedWordCloud(data);
+                
+                // Reload the page to show the analysis results
+                showAlert('Analisis berhasil dilakukan! Anda akan dialihkan ke halaman hasil dalam 2 detik...', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             })
             .catch(error => {
                 loadingIndicator.classList.add('d-none');
@@ -229,6 +246,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Filter tweets and update display
     function filterAndDisplayTweets() {
+        if (!sentimentFilter || !allTweets || allTweets.length === 0) {
+            return;
+        }
+        
         const selectedSentiment = sentimentFilter.value;
         
         // First filter by sentiment
@@ -260,6 +281,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update pagination controls
     function updatePagination() {
+        if (!paginationContainer) return;
+        
         const totalPages = Math.ceil(filteredTweets.length / tweetsPerPage);
         
         // Adjust current page if needed
@@ -358,6 +381,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Display tweets for current page
     function displayTweets() {
         const tweetContainer = document.getElementById('tweet-container');
+        if (!tweetContainer) return;
+        
         tweetContainer.innerHTML = '';
         
         if (!filteredTweets || filteredTweets.length === 0) {
@@ -415,7 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="d-flex justify-content-between align-items-center mt-2">
                     <div>
                         <span class="tweet-badge ${sentimentClass}">${tweet.predicted_sentiment}</span>
-                        <span class="confidence-badge">${tweet.confidence.toFixed(1)}%</span>
+                        <span class="confidence-badge">${typeof tweet.confidence === 'number' ? tweet.confidence.toFixed(1) : tweet.confidence}%</span>
                     </div>
                     ${tweet.tweet_url ? `
                         <a href="${tweet.tweet_url}" class="btn btn-sm btn-outline-dark" target="_blank">
@@ -655,6 +680,48 @@ document.addEventListener('DOMContentLoaded', function() {
             word.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
         });
         
+        // Check if d3 is available
+        if (typeof d3 === 'undefined' || typeof d3.layout === 'undefined' || typeof d3.layout.cloud === 'undefined') {
+            // Fallback to simple display
+            wordCloudContainer.innerHTML = '';
+            const wordCloudFallback = document.createElement('div');
+            wordCloudFallback.className = 'd-flex flex-wrap justify-content-center align-items-center h-100';
+            
+            wordsArray.slice(0, 50).forEach((word, index) => {
+                const wordSpan = document.createElement('span');
+                wordSpan.textContent = word.text;
+                wordSpan.style.fontSize = `${word.size / 10}rem`;
+                wordSpan.style.fontWeight = Math.min(900, 300 + Math.floor(word.size * 10));
+                wordSpan.style.color = word.color;
+                wordSpan.style.padding = '5px';
+                wordSpan.style.display = 'inline-block';
+                wordSpan.style.transition = 'all 0.3s ease';
+                wordSpan.style.opacity = 0;
+                wordSpan.style.transform = 'translateY(20px)';
+                
+                wordSpan.addEventListener('mouseover', function() {
+                    this.style.transform = 'scale(1.2)';
+                    this.style.color = '#000000';
+                });
+                
+                wordSpan.addEventListener('mouseout', function() {
+                    this.style.transform = 'scale(1)';
+                    this.style.color = word.color;
+                });
+                
+                wordCloudFallback.appendChild(wordSpan);
+                
+                // Animate entrance with delay based on index
+                setTimeout(() => {
+                    wordSpan.style.opacity = 1;
+                    wordSpan.style.transform = 'translateY(0)';
+                }, 50 * index);
+            });
+            
+            wordCloudContainer.appendChild(wordCloudFallback);
+            return;
+        }
+        
         // Create SVG element
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('width', '100%');
@@ -774,151 +841,182 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to update analysis results in UI
     function updateAnalysisResults(data) {
         // Update title and description
-        document.getElementById('title-placeholder').textContent = data.title;
+        const titlePlaceholder = document.getElementById('title-placeholder');
+        if (titlePlaceholder) {
+            titlePlaceholder.textContent = data.title;
+        }
         
         // Update counts and percentages
-        document.getElementById('total-tweets').textContent = data.total_tweets;
-        document.getElementById('positive-count').textContent = data.positive_count;
-        document.getElementById('neutral-count').textContent = data.neutral_count;
-        document.getElementById('negative-count').textContent = data.negative_count;
+        updateElementText('total-tweets', data.total_tweets);
+        updateElementText('positive-count', data.positive_count);
+        updateElementText('neutral-count', data.neutral_count);
+        updateElementText('negative-count', data.negative_count);
         
-        document.getElementById('positive-percent').textContent = data.positive_percent + '%';
-        document.getElementById('neutral-percent').textContent = data.neutral_percent + '%';
-        document.getElementById('negative-percent').textContent = data.negative_percent + '%';
+        updateElementText('positive-percent', data.positive_percent + '%');
+        updateElementText('neutral-percent', data.neutral_percent + '%');
+        updateElementText('negative-percent', data.negative_percent + '%');
         
         // Update sentiment distribution with animation
         const positiveSegment = document.getElementById('positive-segment');
         const neutralSegment = document.getElementById('neutral-segment');
         const negativeSegment = document.getElementById('negative-segment');
         
-        // Reset widths first
-        positiveSegment.style.width = '0%';
-        neutralSegment.style.width = '0%';
-        negativeSegment.style.width = '0%';
-        
-        // Then animate to new values
-        setTimeout(() => {
-            positiveSegment.style.width = data.positive_percent + '%';
-            positiveSegment.textContent = data.positive_percent + '%';
-            neutralSegment.style.width = data.neutral_percent + '%';
-            neutralSegment.textContent = data.neutral_percent + '%';
-            negativeSegment.style.width = data.negative_percent + '%';
-            negativeSegment.textContent = data.negative_percent + '%';
-        }, 100);
+        if (positiveSegment && neutralSegment && negativeSegment) {
+            // Reset widths first
+            positiveSegment.style.width = '0%';
+            neutralSegment.style.width = '0%';
+            negativeSegment.style.width = '0%';
+            
+            // Then animate to new values
+            setTimeout(() => {
+                positiveSegment.style.width = data.positive_percent + '%';
+                positiveSegment.textContent = data.positive_percent + '%';
+                neutralSegment.style.width = data.neutral_percent + '%';
+                neutralSegment.textContent = data.neutral_percent + '%';
+                negativeSegment.style.width = data.negative_percent + '%';
+                negativeSegment.textContent = data.negative_percent + '%';
+            }, 100);
+        }
         
         // Make sure the stats cards have appropriate classes and icons
         const positiveStats = document.getElementById('positive-stats');
         const neutralStats = document.getElementById('neutral-stats');
         const negativeStats = document.getElementById('negative-stats');
         
-        positiveStats.className = 'stats-card positive animate-fade-in';
-        positiveStats.querySelector('.icon').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>';
+        if (positiveStats) {
+            positiveStats.className = 'stats-card positive animate-fade-in';
+            const iconEl = positiveStats.querySelector('.icon');
+            if (iconEl) {
+                iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>';
+            }
+        }
         
-        neutralStats.className = 'stats-card neutral animate-fade-in';
-        neutralStats.querySelector('.icon').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+        if (neutralStats) {
+            neutralStats.className = 'stats-card neutral animate-fade-in';
+            const iconEl = neutralStats.querySelector('.icon');
+            if (iconEl) {
+                iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+            }
+        }
         
-        negativeStats.className = 'stats-card negative animate-fade-in';
-        negativeStats.querySelector('.icon').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg>';
+        if (negativeStats) {
+            negativeStats.className = 'stats-card negative animate-fade-in';
+            const iconEl = negativeStats.querySelector('.icon');
+            if (iconEl) {
+                iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg>';
+            }
+        }
         
         // Update top hashtags with animation
         const topHashtags = document.getElementById('top-hashtags');
-        topHashtags.innerHTML = '';
-        
-        data.top_hashtags.forEach((hashtag, index) => {
-            const tag = document.createElement('div');
-            tag.className = 'tag animate-fade-in';
-            tag.style.animationDelay = `${index * 0.1}s`;
-            tag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3L8 21"></path><path d="M16 3l-2 18"></path></svg> ${hashtag.tag} (${hashtag.count})`;
-            topHashtags.appendChild(tag);
-        });
+        if (topHashtags) {
+            topHashtags.innerHTML = '';
+            
+            data.top_hashtags.forEach((hashtag, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'tag animate-fade-in';
+                tag.style.animationDelay = `${index * 0.1}s`;
+                tag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3L8 21"></path><path d="M16 3l-2 18"></path></svg> ${hashtag.tag} (${hashtag.count})`;
+                topHashtags.appendChild(tag);
+            });
+        }
         
         // Update all hashtags
         const allHashtags = document.getElementById('all-hashtags');
-        allHashtags.innerHTML = '';
-        
-        data.top_hashtags.forEach((hashtag, index) => {
-            const tag = document.createElement('div');
-            tag.className = 'tag animate-fade-in';
-            tag.style.animationDelay = `${index * 0.05}s`;
-            tag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3L8 21"></path><path d="M16 3l-2 18"></path></svg> ${hashtag.tag} (${hashtag.count})`;
-            allHashtags.appendChild(tag);
-        });
+        if (allHashtags) {
+            allHashtags.innerHTML = '';
+            
+            data.top_hashtags.forEach((hashtag, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'tag animate-fade-in';
+                tag.style.animationDelay = `${index * 0.05}s`;
+                tag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3L8 21"></path><path d="M16 3l-2 18"></path></svg> ${hashtag.tag} (${hashtag.count})`;
+                allHashtags.appendChild(tag);
+            });
+        }
         
         // Update top users
         const topUsers = document.getElementById('top-users');
-        topUsers.innerHTML = '';
-        
-        data.top_users.forEach(user => {
-            const row = document.createElement('tr');
-            row.className = 'animate-fade-in';
+        if (topUsers) {
+            topUsers.innerHTML = '';
             
-            const sentimentClass = user.dominant_sentiment === 'Positif' ? 'sentiment-positive' : 
-                                  user.dominant_sentiment === 'Netral' ? 'sentiment-neutral' : 'sentiment-negative';
-            
-            row.innerHTML = `
-                <td><a href="https://twitter.com/${user.username}" target="_blank">@${user.username}</a></td>
-                <td>${user.count}</td>
-                <td>${Math.round(user.avg_engagement)}</td>
-                <td><span class="${sentimentClass}">${user.dominant_sentiment}</span></td>
-            `;
-            
-            topUsers.appendChild(row);
-        });
+            data.top_users.forEach(user => {
+                const row = document.createElement('tr');
+                row.className = 'animate-fade-in';
+                
+                const sentimentClass = user.dominant_sentiment === 'Positif' ? 'sentiment-positive' : 
+                                      user.dominant_sentiment === 'Netral' ? 'sentiment-neutral' : 'sentiment-negative';
+                
+                row.innerHTML = `
+                    <td><a href="https://twitter.com/${user.username}" target="_blank">@${user.username}</a></td>
+                    <td>${user.count}</td>
+                    <td>${Math.round(user.avg_engagement)}</td>
+                    <td><span class="${sentimentClass}">${user.dominant_sentiment}</span></td>
+                `;
+                
+                topUsers.appendChild(row);
+            });
+        }
         
         // Update main topics
         const mainTopics = document.getElementById('main-topics');
-        mainTopics.innerHTML = '';
-        
-        data.topics.forEach((topic, index) => {
-            const row = document.createElement('tr');
-            row.className = 'animate-fade-in';
-            row.style.animationDelay = `${index * 0.1}s`;
+        if (mainTopics) {
+            mainTopics.innerHTML = '';
             
-            row.innerHTML = `
-                <td>${topic.topic}</td>
-                <td>${topic.frequency}</td>
-            `;
-            
-            mainTopics.appendChild(row);
-        });
+            data.topics.forEach((topic, index) => {
+                const row = document.createElement('tr');
+                row.className = 'animate-fade-in';
+                row.style.animationDelay = `${index * 0.1}s`;
+                
+                row.innerHTML = `
+                    <td>${topic.topic}</td>
+                    <td>${topic.frequency}</td>
+                `;
+                
+                mainTopics.appendChild(row);
+            });
+        }
 
-
-        // Update main topics
+        // Update main topics (alternative ID)
         const topikUtama = document.getElementById('topik-utama');
-        topikUtama.innerHTML = '';
-        
-        data.topics.forEach((topic, index) => {
-            const row = document.createElement('tr');
-            row.className = 'animate-fade-in';
-            row.style.animationDelay = `${index * 0.1}s`;
+        if (topikUtama) {
+            topikUtama.innerHTML = '';
             
-            row.innerHTML = `
-                <td>${topic.topic}</td>
-                <td>${topic.frequency}</td>
-            `;
-            
-            topikUtama.appendChild(row);
-        });
+            data.topics.forEach((topic, index) => {
+                const row = document.createElement('tr');
+                row.className = 'animate-fade-in';
+                row.style.animationDelay = `${index * 0.1}s`;
+                
+                row.innerHTML = `
+                    <td>${topic.topic}</td>
+                    <td>${topic.frequency}</td>
+                `;
+                
+                topikUtama.appendChild(row);
+            });
+        }
         
         // Update hashtag sentiment
         const hashtagSentiment = document.getElementById('hashtag-sentiment');
-        hashtagSentiment.innerHTML = '';
-        
-        data.hashtag_sentiment.forEach((stat, index) => {
-            const row = document.createElement('tr');
-            row.className = 'animate-fade-in';
-            row.style.animationDelay = `${index * 0.1}s`;
+        if (hashtagSentiment) {
+            hashtagSentiment.innerHTML = '';
             
-            row.innerHTML = `
-                <td>${stat.tag}</td>
-                <td>${stat.positive}%</td>
-                <td>${stat.neutral}%</td>
-                <td>${stat.negative}%</td>
-                <td>${stat.total}</td>
-            `;
-            
-            hashtagSentiment.appendChild(row);
-        });
+            data.hashtag_sentiment.forEach((stat, index) => {
+                const row = document.createElement('tr');
+                row.className = 'animate-fade-in';
+                row.style.animationDelay = `${index * 0.1}s`;
+                
+                row.innerHTML = `
+                    <td>${stat.tag}</td>
+                    <td>${stat.positive}%</td>
+                    <td>${stat.neutral}%</td>
+                    <td>${stat.negative}%</td>
+                    <td>${stat.total}</td>
+                `;
+                
+                hashtagSentiment.appendChild(row);
+            });
+        }
         
         // Initialize data for charts
         createSentimentByHashtagChart(data.hashtag_sentiment);
@@ -927,22 +1025,31 @@ document.addEventListener('DOMContentLoaded', function() {
         createTopWordsCharts(data.sentiment_words);
         
         // Update sentiment plot
-        if (data.sentiment_plot) {
-            const sentimentPlot = document.getElementById('sentiment-plot');
-            sentimentPlot.src = 'data:image/png;base64,' + data.sentiment_plot;
-            sentimentPlot.classList.remove('d-none');
-            sentimentPlot.classList.add('animate-fade-in');
-        } else {
-            document.getElementById('sentiment-plot').classList.add('d-none');
+        const sentimentPlot = document.getElementById('sentiment-plot');
+        if (sentimentPlot) {
+            if (data.sentiment_plot) {
+                sentimentPlot.src = 'data:image/png;base64,' + data.sentiment_plot;
+                sentimentPlot.classList.remove('d-none');
+                sentimentPlot.classList.add('animate-fade-in');
+            } else {
+                sentimentPlot.classList.add('d-none');
+            }
         }
 
         // Initialize the welcome message in chatbot
         initializeChatbot(data);
     }
     
+    // Helper function to update element text if element exists
+    function updateElementText(id, text) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = text;
+        }
+    }
+    
     // Initialize chatbot with welcome message
     function initializeChatbot(data) {
-        const chatbotMessages = document.getElementById('chatbot-messages');
         if (!chatbotMessages) return;
         
         // Clear any existing messages
@@ -973,10 +1080,107 @@ document.addEventListener('DOMContentLoaded', function() {
         chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
     }
     
+    // Function to send message to chatbot
+    function sendChatbotMessage() {
+        const messageText = chatbotInput.value.trim();
+        
+        if (!messageText) return;
+        
+        // Add user message to chat
+        const userMessage = document.createElement('div');
+        userMessage.className = 'message message-user animate-fade-in';
+        userMessage.textContent = messageText;
+        chatbotMessages.appendChild(userMessage);
+        
+        // Clear input
+        chatbotInput.value = '';
+        
+        // Add loading indicator
+        const loadingMessage = document.createElement('div');
+        loadingMessage.className = 'message message-bot animate-fade-in';
+        loadingMessage.innerHTML = '<div class="d-flex align-items-center"><div class="spinner-grow spinner-grow-sm me-2" role="status"></div><span>Menganalisis data dan menyusun respons...</span></div>';
+        chatbotMessages.appendChild(loadingMessage);
+        
+        // Scroll to bottom
+        chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+        
+        // Send to server
+        fetch('/chatbot', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({message: messageText})
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading message
+            chatbotMessages.removeChild(loadingMessage);
+            
+            // Format the response text with proper line breaks and formatting
+            const formattedResponse = formatChatbotResponse(data.response);
+            
+            // Add bot response with animation
+            const botMessage = document.createElement('div');
+            botMessage.className = 'message message-bot animate-fade-in';
+            botMessage.innerHTML = formattedResponse;
+            chatbotMessages.appendChild(botMessage);
+            
+            // Scroll to bottom
+            chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+        })
+        .catch(error => {
+            // Remove loading message
+            chatbotMessages.removeChild(loadingMessage);
+            
+            // Add error message
+            const errorMessage = document.createElement('div');
+            errorMessage.className = 'message message-bot animate-fade-in';
+            errorMessage.textContent = 'Maaf, terjadi kesalahan dalam berkomunikasi dengan chatbot. Silakan coba lagi.';
+            chatbotMessages.appendChild(errorMessage);
+            
+            // Scroll to bottom
+            chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+        });
+    }
+    
+    // Format chatbot response with proper HTML formatting
+    function formatChatbotResponse(text) {
+        if (!text) return '';
+        
+        // Convert line breaks to <br>
+        let formatted = text.replace(/\n/g, '<br>');
+        
+        // Format numbered lists (1. Item)
+        formatted = formatted.replace(/(\d+\.\s+[^\n<]+)(<br>|$)/g, '<li>$1</li>');
+        
+        // Format bullet points (- Item or • Item)
+        formatted = formatted.replace(/([-•]\s+[^\n<]+)(<br>|$)/g, '<li>$1</li>');
+        
+        // Wrap lists in <ul> tags
+        formatted = formatted.replace(/<li>([^<]+)<\/li>(<li>)/g, '<li>$1</li>$2');
+        formatted = formatted.replace(/<li>([^<]+)<\/li>(?!<li>)/g, '<ul><li>$1</li></ul>');
+        formatted = formatted.replace(/<\/ul><ul>/g, '');
+        
+        // Bold text between asterisks (*text*)
+        formatted = formatted.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
+        
+        // Italic text between underscores (_text_)
+        formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
+        
+        // Create paragraphs for text blocks
+        formatted = '<p>' + formatted.replace(/<br><br>/g, '</p><p>') + '</p>';
+        
+        // Clean up empty paragraphs
+        formatted = formatted.replace(/<p><\/p>/g, '');
+        
+        return formatted;
+    }
+    
     // Function to create sentiment by hashtag chart
     function createSentimentByHashtagChart(hashtagSentimentData) {
         const chartContainer = document.getElementById('sentiment-by-hashtag-chart');
-        if (!chartContainer || !hashtagSentimentData || hashtagSentimentData.length === 0) return;
+        if (!chartContainer || !hashtagSentimentData || hashtagSentimentData.length === 0 || typeof Chart === 'undefined') return;
         
         // Add loading indicator
         chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
@@ -1103,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create sentiment by location chart
     function createSentimentByLocationChart(tweetsData) {
         const chartContainer = document.getElementById('sentiment-by-location-chart');
-        if (!chartContainer || !tweetsData || tweetsData.length === 0) return;
+        if (!chartContainer || !tweetsData || tweetsData.length === 0 || typeof Chart === 'undefined') return;
         
         // Add loading indicator
         chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
@@ -1271,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create sentiment by language chart
     function createSentimentByLanguageChart(tweetsData) {
         const chartContainer = document.getElementById('sentiment-by-language-chart');
-        if (!chartContainer || !tweetsData || tweetsData.length === 0) return;
+        if (!chartContainer || !tweetsData || tweetsData.length === 0 || typeof Chart === 'undefined') return;
         
         // Add loading indicator
         chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
@@ -1450,7 +1654,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create word frequency chart with enhanced animations
     function createWordFrequencyChart(containerId, wordFrequencies, title, color) {
         const chartContainer = document.getElementById(containerId);
-        if (!chartContainer || !wordFrequencies || wordFrequencies.length === 0) {
+        if (!chartContainer || !wordFrequencies || wordFrequencies.length === 0 || typeof Chart === 'undefined') {
             if (chartContainer) {
                 chartContainer.innerHTML = '<p class="text-center text-muted my-5">Tidak cukup data untuk menampilkan grafik ini.</p>';
             }
@@ -1616,103 +1820,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 easing: 'easeOutQuart'
             }
         };
-    }
-    
-    // Function to send message to chatbot
-    function sendChatbotMessage() {
-        const messageText = chatbotInput.value.trim();
-        
-        if (!messageText) return;
-        
-        // Add user message to chat
-        const userMessage = document.createElement('div');
-        userMessage.className = 'message message-user animate-fade-in';
-        userMessage.textContent = messageText;
-        chatbotMessages.appendChild(userMessage);
-        
-        // Clear input
-        chatbotInput.value = '';
-        
-        // Add loading indicator
-        const loadingMessage = document.createElement('div');
-        loadingMessage.className = 'message message-bot animate-fade-in';
-        loadingMessage.innerHTML = '<div class="d-flex align-items-center"><div class="spinner-grow spinner-grow-sm me-2" role="status"></div><span>Menganalisis data dan menyusun respons...</span></div>';
-        chatbotMessages.appendChild(loadingMessage);
-        
-        // Scroll to bottom
-        chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
-        
-        // Send to server
-        fetch('/chatbot', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({message: messageText})
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Remove loading message
-            chatbotMessages.removeChild(loadingMessage);
-            
-            // Format the response text with proper line breaks and formatting
-            const formattedResponse = formatChatbotResponse(data.response);
-            
-            // Add bot response with animation
-            const botMessage = document.createElement('div');
-            botMessage.className = 'message message-bot animate-fade-in';
-            botMessage.innerHTML = formattedResponse;
-            chatbotMessages.appendChild(botMessage);
-            
-            // Scroll to bottom
-            chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
-        })
-        .catch(error => {
-            // Remove loading message
-            chatbotMessages.removeChild(loadingMessage);
-            
-            // Add error message
-            const errorMessage = document.createElement('div');
-            errorMessage.className = 'message message-bot animate-fade-in';
-            errorMessage.textContent = 'Maaf, terjadi kesalahan dalam berkomunikasi dengan chatbot. Silakan coba lagi.';
-            chatbotMessages.appendChild(errorMessage);
-            
-            // Scroll to bottom
-            chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
-        });
-    }
-    
-    // Format chatbot response with proper HTML formatting
-    function formatChatbotResponse(text) {
-        if (!text) return '';
-        
-        // Convert line breaks to <br>
-        let formatted = text.replace(/\n/g, '<br>');
-        
-        // Format numbered lists (1. Item)
-        formatted = formatted.replace(/(\d+\.\s+[^\n<]+)(<br>|$)/g, '<li>$1</li>');
-        
-        // Format bullet points (- Item or • Item)
-        formatted = formatted.replace(/([-•]\s+[^\n<]+)(<br>|$)/g, '<li>$1</li>');
-        
-        // Wrap lists in <ul> tags
-        formatted = formatted.replace(/<li>([^<]+)<\/li>(<li>)/g, '<li>$1</li>$2');
-        formatted = formatted.replace(/<li>([^<]+)<\/li>(?!<li>)/g, '<ul><li>$1</li></ul>');
-        formatted = formatted.replace(/<\/ul><ul>/g, '');
-        
-        // Bold text between asterisks (*text*)
-        formatted = formatted.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
-        
-        // Italic text between underscores (_text_)
-        formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
-        
-        // Create paragraphs for text blocks
-        formatted = '<p>' + formatted.replace(/<br><br>/g, '</p><p>') + '</p>';
-        
-        // Clean up empty paragraphs
-        formatted = formatted.replace(/<p><\/p>/g, '');
-        
-        return formatted;
     }
     
     // Function to show alert

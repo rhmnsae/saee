@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Profil - Analisis Sentimen X{% endblock %}
+
+{% block content %}
+<div class="card animate-fade-in">
+    <div class="card-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <h2 class="card-title">Profil Pengguna</h2>
+    </div>
+    <div class="card-body">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} animate-fade-in" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <div class="col-md-3">
+                <div class="text-center mb-4">
+                    <div class="avatar-placeholder bg-dark text-white rounded-circle d-flex align-items-center justify-content-center mb-3 mx-auto" style="width: 120px; height: 120px;">
+                        <span style="font-size: 36px;">{{ current_user.username[0] | upper }}</span>
+                    </div>
+                    <h5>{{ current_user.name }}</h5>
+                    <p class="text-muted">@{{ current_user.username }}</p>
+                    <p class="text-muted small">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        Terdaftar sejak {{ current_user.created_at.strftime('%d %B %Y') }}
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-9">
+                <form method="POST" action="{{ url_for('auth.profile') }}">
+                    {{ form.hidden_tag() }}
+                    
+                    <h4 class="mb-4">Informasi Akun</h4>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="username" class="form-label fw-bold">Username</label>
+                                {{ form.username(class="form-control", readonly=True) }}
+                                <small class="form-text text-muted">Username tidak dapat diubah</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="email" class="form-label fw-bold">Email</label>
+                                {{ form.email(class="form-control", readonly=True) }}
+                                <small class="form-text text-muted">Email tidak dapat diubah</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group mb-4">
+                        <label for="name" class="form-label fw-bold">Nama Lengkap</label>
+                        {{ form.name(class="form-control") }}
+                        {% if form.name.errors %}
+                            <div class="text-danger">
+                                {% for error in form.name.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <h4 class="mb-4">Ubah Password</h4>
+                    <p class="text-muted mb-3">Kosongkan jika tidak ingin mengubah password</p>
+                    
+                    <div class="form-group mb-3">
+                        <label for="current_password" class="form-label fw-bold">Password Saat Ini</label>
+                        {{ form.current_password(class="form-control") }}
+                        {% if form.current_password.errors %}
+                            <div class="text-danger">
+                                {% for error in form.current_password.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="new_password" class="form-label fw-bold">Password Baru</label>
+                                {{ form.new_password(class="form-control") }}
+                                {% if form.new_password.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.new_password.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="confirm_password" class="form-label fw-bold">Konfirmasi Password Baru</label>
+                                {{ form.confirm_password(class="form-control") }}
+                                {% if form.confirm_password.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.confirm_password.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end mt-4">
+                        {{ form.submit(class="btn btn-dark") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

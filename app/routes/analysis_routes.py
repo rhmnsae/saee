@@ -17,6 +17,10 @@ from reportlab.lib.units import inch, cm
 from reportlab.platypus import PageBreak
 from reportlab.platypus.flowables import HRFlowable
 from reportlab.graphics.charts.barcharts import VerticalBarChart
+from flask_login import login_required, current_user
+
+from app.models import db
+from app.models.analysis import Analysis
 
 analysis_bp = Blueprint('analysis', __name__)
 
@@ -27,6 +31,7 @@ def clean_for_json(value):
     return value
 
 @analysis_bp.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     # Verifikasi model terlatih ada
     if not os.path.exists(current_app.config['MODEL_PATH']):
@@ -166,6 +171,17 @@ def upload_file():
                 'top_topics': [t['topic'] for t in topics[:5]]
             }
             
+            # Save analysis to database
+            new_analysis = Analysis(
+                title=title,
+                file_path=file_path,
+                result_file=output_file,
+                user_id=current_user.id
+            )
+            new_analysis.save_results(analysis_results)
+            db.session.add(new_analysis)
+            db.session.commit()
+            
             return jsonify(analysis_results)
         except Exception as e:
             import traceback
@@ -173,6 +189,7 @@ def upload_file():
             return jsonify({'error': str(e)})
 
 @analysis_bp.route('/filter_tweets', methods=['POST'])
+@login_required
 def filter_tweets():
     data = request.json
     sentiment_filter = data.get('sentiment', 'all')
@@ -213,6 +230,7 @@ def filter_tweets():
     return jsonify({'tweets': tweets_for_display})
 
 @analysis_bp.route('/download_report', methods=['GET'])
+@login_required
 def download_report():
     # Cek apakah ada data analisis di session
     if 'analysis_file' not in session or 'analysis_context' not in session:

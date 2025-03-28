@@ -1,10 +1,12 @@
 import os
 from flask import Blueprint, current_app, render_template, flash, redirect, url_for
+from flask_login import login_required
 from app.services.sentiment_analysis import load_sentiment_model
 
 main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
+@login_required
 def index():
     # Cek apakah model terlatih ada
     model_path = current_app.config['MODEL_PATH']

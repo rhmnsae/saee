@@ -32,13 +32,28 @@ def create_app(config_file=None):
     except LookupError:
         nltk.download('punkt')
     
+    # Inisialisasi database
+    from app.models import db, login_manager
+    db.init_app(app)
+    
+    # Inisialisasi login manager
+    login_manager.init_app(app)
+    
     # Import dan register blueprint
     from app.routes.main_routes import main_bp
     from app.routes.analysis_routes import analysis_bp
     from app.routes.chatbot_routes import chatbot_bp
+    from app.routes.auth_routes import auth_bp
+    from app.routes.history_routes import history_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(analysis_bp)
     app.register_blueprint(chatbot_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(history_bp)
+    
+    # Buat database jika belum ada
+    with app.app_context():
+        db.create_all()
     
     return app
